@@ -8,12 +8,12 @@ export async function fetchModels(base) {
   return data?.data || [];
 }
 
-export async function streamChat({ base, prompt, model, temperature, maxTokens, onDelta, onDone, signal }) {
+export async function streamChat({ base, messages, model, temperature, maxTokens, onDelta, onDone, signal }) {
   const cleanBase = trimBase(base);
 
   const body = {
     model,
-    messages: [{ role: "user", content: prompt }],
+    messages,
     temperature,
     max_tokens: maxTokens,
     stream: true

@@ -263,6 +263,58 @@ button[disabled] {
   padding: 0;
 }
 
+.msg {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.msg-label {
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  color: var(--text-strong);
+}
+
+.msg.user {
+  color: #ffe066;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.msg.user .msg-label {
+  color: #ffe066;
+}
+
+.msg.user .msg-body {
+  text-align: right;
+}
+
+.msg.assistant {
+  color: var(--text);
+  align-items: flex-start;
+  text-align: left;
+}
+
+.msg.assistant .msg-body {
+  text-align: left;
+}
+
+.msg-separator {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
+}
+
+.status-line {
+  margin-top: 10px;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
   #out { height: auto; max-height: 60vh; }

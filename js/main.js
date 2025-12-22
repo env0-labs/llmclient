@@ -25,6 +25,7 @@ const els = {
 
 let abortController = null;
 let servers = loadServers();
+let conversation = [];
 
 function populateServerSelect(selectedUrl) {
   const sel = els.serverSelect;
@@ -87,15 +88,53 @@ function toggleBusy(busy) {
   });
 }
 
+function conversationToMarkdown() {
+  if (!conversation.length) return "(nothing yet)";
+
+  return conversation
+    .map((msg) => {
+      const label = msg.role === "assistant" ? "Assistant" : "User";
+      const body = msg.content || "";
+      return { label, body, role: msg.role };
+    });
+}
+
+function renderConversation(statusText = "") {
+  if (!els.out) return;
+
+  if (!conversation.length) {
+    renderMarkdown(els.out, statusText || "(nothing yet)");
+    return;
+  }
+
+  const statusHtml = statusText
+    ? (window.marked ? marked.parse(statusText) : statusText)
+    : "";
+
+  const convoHtml = conversationToMarkdown()
+    .map(({ label, body, role }) => {
+      const bodyHtml = window.marked ? marked.parse(body) : body;
+      const cls = role === "assistant" ? "assistant" : "user";
+      return `<div class="msg ${cls}">
+        <div class="msg-label">${label}</div>
+        <div class="msg-body">${bodyHtml}</div>
+      </div>`;
+    })
+    .join('<hr class="msg-separator" />');
+
+  els.out.innerHTML = `${convoHtml}${statusHtml ? `<div class="status-line">${statusHtml}</div>` : ""}`;
+  els.out.scrollTop = els.out.scrollHeight;
+}
+
 async function handleLoadModels() {
-  renderMarkdown(els.out, "Loading models...");
+  renderConversation("_Status: Loading models..._");
   const base = (els.base.value || "").replace(/\/+$/, "");
   try {
     const data = await fetchModels(base);
     populateModels(data);
-    renderMarkdown(els.out, "Models loaded.");
+    renderConversation("_Status: Models loaded._");
   } catch (e) {
-    renderMarkdown(els.out, String(e));
+    renderConversation(`_Status: ${String(e)}_`);
   }
 }
 
@@ -107,29 +146,31 @@ async function handleSend() {
   toggleBusy(true);
   abortController = new AbortController();
 
-  let fullText = "";
-  renderMarkdown(els.out, "");
+  const userMsg = { role: "user", content: prompt };
+  const assistantMsg = { role: "assistant", content: "" };
+  conversation.push(userMsg, assistantMsg);
+  if (els.prompt) els.prompt.value = "";
+  renderConversation();
 
   try {
     await streamChat({
       base,
-      prompt,
+      messages: conversation.slice(0, -1), // exclude the in-progress assistant message
       model: els.model.value,
       temperature: Number(els.temp.value),
       maxTokens: Number(els.max.value),
       signal: abortController.signal,
       onDelta: (delta) => {
-        fullText += delta;
-        renderMarkdown(els.out, fullText);
-        els.out.scrollTop = els.out.scrollHeight;
+        assistantMsg.content += delta;
+        renderConversation();
       },
       onDone: () => {
-        renderMarkdown(els.out, fullText);
-        els.out.scrollTop = els.out.scrollHeight;
+        renderConversation();
       }
     });
   } catch (e) {
-    renderMarkdown(els.out, String(e));
+    assistantMsg.content = `Error: ${String(e)}`;
+    renderConversation();
   } finally {
     toggleBusy(false);
     abortController = null;
@@ -189,7 +230,8 @@ function wireEvents() {
 
   els.clear?.addEventListener("click", () => {
     if (els.prompt) els.prompt.value = "";
-    renderMarkdown(els.out, "(cleared)");
+    conversation = [];
+    renderConversation("(cleared)");
   });
 
   els.prompt?.addEventListener("keydown", (e) => {
