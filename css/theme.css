@@ -216,6 +216,10 @@ button[disabled] {
     0 0 2px rgba(200,255,220,0.90),
     0 0 12px rgba(0,255,140,0.32);
   position: relative;
+
+  /* Scrollbar theme */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,255,140,0.35) #000;
 }
 
 #out h1, #out h2, #out h3 {
@@ -261,6 +265,27 @@ button[disabled] {
 #out pre code {
   background: transparent;
   padding: 0;
+}
+
+#out::-webkit-scrollbar {
+  width: 10px;
+}
+
+#out::-webkit-scrollbar-track {
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+#out::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(0,255,140,0.28), rgba(0,255,140,0.48));
+  border: 1px solid rgba(0,255,140,0.35);
+  border-radius: 8px;
+  box-shadow: inset 0 0 10px rgba(0,255,140,0.25);
+}
+
+#out::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(0,255,140,0.38), rgba(0,255,140,0.65));
 }
 
 .msg {
