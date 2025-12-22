@@ -33,6 +33,10 @@ body {
   color: var(--text);
   font-family: "Courier New", Courier, ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: 0.2px;
+  text-shadow:
+    0 0 3px rgba(0, 255, 140, 0.35),
+    0 0 8px rgba(0, 255, 140, 0.18),
+    0 0 14px rgba(0, 255, 140, 0.10);
 }
 
 body::before {
@@ -49,6 +53,23 @@ body::before {
     );
   opacity: 0.45;
   mix-blend-mode: multiply;
+}
+
+body::after {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 255, 140, 0.02) 0px,
+      rgba(0, 255, 140, 0.02) 1px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0) 3px
+    );
+  opacity: 0.35;
+  mix-blend-mode: screen;
 }
 
 @keyframes flicker {
