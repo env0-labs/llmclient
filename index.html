@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ewan's LLM</title>
+
+  <link rel="stylesheet" href="css/theme.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+  <div class="app">
+    <!-- LEFT: settings + input -->
+    <div class="panel">
+      <h2>Ewan's LLM</h2>
+      <div class="muted">Enter to send | Shift+Enter newline | Streaming on</div>
+
+      <!-- Canonical base URL (hidden; still used by fetch code) -->
+      <input id="base" value="http://192.168.1.129:1234" type="hidden" />
+
+      <!-- Selected server (nickname only, no IP) -->
+      <div class="row">
+        <label for="serverSelect">Selected Server</label>
+        <select id="serverSelect"></select>
+      </div>
+
+      <div class="btnrow">
+        <button id="serverAddToggle" type="button">Add</button>
+        <button id="serverRemove" type="button" title="Remove selected server">Remove</button>
+      </div>
+
+      <!-- Add server panel -->
+      <div id="serverAddPanel" class="row hidden">
+        <label class="align-top">New</label>
+        <div class="stack">
+          <input id="serverNick" placeholder="Nickname (e.g., bitfuser)" />
+          <input id="serverUrl" placeholder="http://192.168.1.129:1234" />
+          <div class="action-row">
+            <button id="serverSave" type="button">Save</button>
+            <button id="serverCancel" type="button">Cancel</button>
+          </div>
+          <div class="muted slim-note">Stored locally in your browser (localStorage).</div>
+        </div>
+      </div>
+
+      <!-- Load button above model -->
+      <div class="btnfull">
+        <button id="load" type="button">Load models</button>
+      </div>
+
+      <div class="row">
+        <label for="model">Model</label>
+        <select id="model"></select>
+      </div>
+
+      <div class="row">
+        <label for="temp">Temp</label>
+        <input id="temp" type="number" min="0" max="2" step="0.1" value="0.7" />
+      </div>
+
+      <div class="row">
+        <label for="max">Max</label>
+        <input id="max" type="number" min="1" max="6000" step="1" value="3000" />
+      </div>
+
+      <div class="btnfull">
+        <button id="stop" type="button" disabled>Stop</button>
+      </div>
+
+      <label for="prompt" style="display:block; margin-bottom:8px;">Prompt</label>
+      <textarea id="prompt" placeholder="Type a prompt..."></textarea>
+
+      <div class="btnrow" style="margin-top: var(--space); margin-bottom: 0;">
+        <button id="send" type="button">Send</button>
+        <button id="clear" type="button">Clear</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: output -->
+    <div class="panel" style="padding:0;">
+      <div id="out">(nothing yet)</div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
