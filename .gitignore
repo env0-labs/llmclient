@@ -1,0 +1,7 @@
+cat <<EOF > .gitignore
+node_modules/
+dist/
+.DS_Store
+.vscode/*
+!.vscode/settings.json
+EOF
