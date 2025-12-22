@@ -13,8 +13,13 @@
   <div class="app">
     <!-- LEFT: settings + input -->
     <div class="panel">
-      <h2>Ewan's LLM</h2>
-      <div class="muted">Enter to send | Shift+Enter newline | Streaming on</div>
+      <div class="panel-head">
+        <div>
+          <h2>Ewan's LLM</h2>
+          <div class="muted">Enter to send | Shift+Enter newline | Streaming on</div>
+        </div>
+        <button id="openSettings" class="ghost" type="button">Settings</button>
+      </div>
 
       <!-- Canonical base URL (hidden; still used by fetch code) -->
       <input id="base" value="http://192.168.1.129:1234" type="hidden" />
@@ -25,29 +30,7 @@
         <select id="serverSelect"></select>
       </div>
 
-      <div class="btnrow">
-        <button id="serverAddToggle" type="button">Add</button>
-        <button id="serverRemove" type="button" title="Remove selected server">Remove</button>
-      </div>
-
-      <!-- Add server panel -->
-      <div id="serverAddPanel" class="row hidden">
-        <label class="align-top">New</label>
-        <div class="stack">
-          <input id="serverNick" placeholder="Nickname (e.g., bitfuser)" />
-          <input id="serverUrl" placeholder="http://192.168.1.129:1234" />
-          <div class="action-row">
-            <button id="serverSave" type="button">Save</button>
-            <button id="serverCancel" type="button">Cancel</button>
-          </div>
-          <div class="muted slim-note">Stored locally in your browser (localStorage).</div>
-        </div>
-      </div>
-
-      <!-- Load button above model -->
-      <div class="btnfull">
-        <button id="load" type="button">Load models</button>
-      </div>
+      <div class="muted slim-note" style="margin-top:-4px;">Models load automatically when you change servers.</div>
 
       <div class="row">
         <label for="model">Model</label>
@@ -62,6 +45,11 @@
       <div class="row">
         <label for="max">Max</label>
         <input id="max" type="number" min="1" max="6000" step="1" value="3000" />
+      </div>
+
+      <!-- Load button above model -->
+      <div class="btnfull">
+        <button id="load" type="button">Reload models</button>
       </div>
 
       <div class="btnfull">
@@ -80,6 +68,47 @@
     <!-- RIGHT: output -->
     <div class="panel" style="padding:0;">
       <div id="out">(nothing yet)</div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-content panel">
+      <div class="modal-header">
+        <h3>Settings</h3>
+        <button id="closeSettings" type="button">Close</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="section-title">Servers</div>
+        <div class="row">
+          <label for="settingsServerSelect">Saved Servers</label>
+          <select id="settingsServerSelect"></select>
+        </div>
+        <div class="action-row" style="margin-bottom: var(--space);">
+          <button id="settingsServerRemove" type="button">Remove</button>
+          <button id="settingsServerLoad" type="button">Load models</button>
+        </div>
+        <div class="stack">
+          <input id="settingsServerNick" placeholder="Nickname (e.g., bitfuser)" />
+          <input id="settingsServerUrl" placeholder="http://192.168.1.129:1234" />
+          <div class="action-row">
+            <button id="settingsServerSave" type="button">Add / Update</button>
+          </div>
+          <div class="muted slim-note">Stored locally in your browser (localStorage).</div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="section-title">Screen FX</div>
+        <div class="row range-row">
+          <label for="glowRange">Glow</label>
+          <input id="glowRange" type="range" min="0" max="2" step="0.05" value="1" />
+        </div>
+        <div class="row range-row">
+          <label for="scanlineRange">Scanlines</label>
+          <input id="scanlineRange" type="range" min="0" max="0.6" step="0.02" value="0.35" />
+        </div>
+      </div>
     </div>
   </div>
 

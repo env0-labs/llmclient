@@ -5,13 +5,6 @@ import { $, renderMarkdown, setBusy } from "./ui.js";
 const els = {
   base: $("base"),
   serverSelect: $("serverSelect"),
-  serverAddToggle: $("serverAddToggle"),
-  serverRemove: $("serverRemove"),
-  serverAddPanel: $("serverAddPanel"),
-  serverNick: $("serverNick"),
-  serverUrl: $("serverUrl"),
-  serverSave: $("serverSave"),
-  serverCancel: $("serverCancel"),
   load: $("load"),
   model: $("model"),
   temp: $("temp"),
@@ -20,42 +13,49 @@ const els = {
   send: $("send"),
   clear: $("clear"),
   prompt: $("prompt"),
-  out: $("out")
+  out: $("out"),
+  openSettings: $("openSettings"),
+  closeSettings: $("closeSettings"),
+  settingsModal: $("settingsModal"),
+  settingsServerSelect: $("settingsServerSelect"),
+  settingsServerNick: $("settingsServerNick"),
+  settingsServerUrl: $("settingsServerUrl"),
+  settingsServerSave: $("settingsServerSave"),
+  settingsServerRemove: $("settingsServerRemove"),
+  settingsServerLoad: $("settingsServerLoad"),
+  glowRange: $("glowRange"),
+  scanlineRange: $("scanlineRange")
 };
 
 let abortController = null;
 let servers = loadServers();
 let conversation = [];
+const GLOW_BASE = [0.35, 0.18, 0.10];
+const SCANLINE_DEFAULT = 0.35;
+let glowIntensity = 1;
+let scanlineOpacity = SCANLINE_DEFAULT;
 
 function populateServerSelect(selectedUrl) {
-  const sel = els.serverSelect;
-  if (!sel) return;
-  sel.innerHTML = "";
+  const selects = [els.serverSelect, els.settingsServerSelect].filter(Boolean);
+  if (!selects.length) return;
 
-  // IMPORTANT: nickname only (no IP/URL in UI)
-  servers.forEach((s) => {
-    const opt = document.createElement("option");
-    opt.value = s.url;          // internal value
-    opt.textContent = s.nick;   // human display
-    sel.appendChild(opt);
+  const urlToSelect = normaliseUrl(selectedUrl || els.base?.value) || servers[0]?.url || "";
+
+  selects.forEach((sel) => {
+    sel.innerHTML = "";
+    servers.forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s.url;          // internal value
+      opt.textContent = s.nick;   // human display
+      sel.appendChild(opt);
+    });
+    const match = [...sel.options].find(o => o.value === urlToSelect);
+    if (match) sel.value = urlToSelect;
+    else if (servers[0]) sel.value = servers[0].url;
   });
 
-  const urlToSelect = selectedUrl || normaliseUrl(els.base.value) || servers[0]?.url;
-  const match = [...sel.options].find(o => o.value === urlToSelect);
-
-  if (match) sel.value = urlToSelect;
-  else if (servers[0]) sel.value = servers[0].url;
-
-  els.base.value = sel.value || els.base.value;
-}
-
-function openAddPanel(open) {
-  if (!els.serverAddPanel) return;
-  els.serverAddPanel.classList.toggle("hidden", !open);
-  if (open) {
-    els.serverNick.value = "";
-    els.serverUrl.value = "";
-    els.serverNick.focus();
+  if (els.base) {
+    els.base.value = urlToSelect || els.base.value;
   }
 }
 
@@ -76,16 +76,36 @@ function toggleBusy(busy) {
       els.send,
       els.load,
       els.serverSelect,
-      els.serverAddToggle,
-      els.serverRemove,
-      els.base,
-      els.serverNick,
-      els.serverUrl,
-      els.serverSave,
-      els.serverCancel
+      els.base
     ],
     enableOnBusy: [els.stop]
   });
+}
+
+function setActiveServer(url, { loadModels = true } = {}) {
+  const normalized = normaliseUrl(url);
+  if (!normalized) return;
+
+  if (els.base) els.base.value = normalized;
+  if (els.serverSelect) els.serverSelect.value = normalized;
+  if (els.settingsServerSelect) els.settingsServerSelect.value = normalized;
+
+  if (loadModels) handleLoadModels();
+}
+
+function applyGlow(intensity) {
+  glowIntensity = intensity;
+  const root = document.documentElement;
+  root.style.setProperty("--glow-intensity", intensity.toString());
+  root.style.setProperty("--glow-1", (GLOW_BASE[0] * intensity).toFixed(3));
+  root.style.setProperty("--glow-2", (GLOW_BASE[1] * intensity).toFixed(3));
+  root.style.setProperty("--glow-3", (GLOW_BASE[2] * intensity).toFixed(3));
+}
+
+function applyScanlines(opacity) {
+  scanlineOpacity = opacity;
+  const root = document.documentElement;
+  root.style.setProperty("--scanline-opacity", opacity.toFixed(3));
 }
 
 function conversationToMarkdown() {
@@ -128,7 +148,11 @@ function renderConversation(statusText = "") {
 
 async function handleLoadModels() {
   renderConversation("_Status: Loading models..._");
-  const base = (els.base.value || "").replace(/\/+$/, "");
+  const base = (els.base?.value || "").replace(/\/+$/, "");
+  if (!base) {
+    renderConversation("_Status: No server selected._");
+    return;
+  }
   try {
     const data = await fetchModels(base);
     populateModels(data);
@@ -179,7 +203,11 @@ async function handleSend() {
 
 function wireEvents() {
   els.serverSelect?.addEventListener("change", () => {
-    els.base.value = els.serverSelect.value;
+    setActiveServer(els.serverSelect.value, { loadModels: true });
+  });
+
+  els.settingsServerSelect?.addEventListener("change", () => {
+    setActiveServer(els.settingsServerSelect.value, { loadModels: true });
   });
 
   // Kept for safety, even though base is hidden
@@ -190,16 +218,9 @@ function wireEvents() {
     if (match) populateServerSelect(u);
   });
 
-  els.serverAddToggle?.addEventListener("click", () => {
-    const isOpen = !els.serverAddPanel.classList.contains("hidden");
-    openAddPanel(!isOpen);
-  });
-
-  els.serverCancel?.addEventListener("click", () => openAddPanel(false));
-
-  els.serverSave?.addEventListener("click", () => {
-    const nick = (els.serverNick.value || "").trim() || "server";
-    const url = normaliseUrl(els.serverUrl.value);
+  els.settingsServerSave?.addEventListener("click", () => {
+    const nick = (els.settingsServerNick.value || "").trim() || "server";
+    const url = normaliseUrl(els.settingsServerUrl.value);
     if (!url) return;
 
     const existingIdx = servers.findIndex(s => s.url === url);
@@ -211,18 +232,20 @@ function wireEvents() {
 
     saveServers(servers);
     populateServerSelect(url);
-    openAddPanel(false);
+    setActiveServer(url, { loadModels: true });
   });
 
-  els.serverRemove?.addEventListener("click", () => {
-    const selected = els.serverSelect.value;
-    if (!selected) return;
-    if (servers.length <= 1) return;
+  els.settingsServerRemove?.addEventListener("click", () => {
+    const selected = els.settingsServerSelect?.value || els.serverSelect?.value;
+    if (!selected || servers.length <= 1) return;
 
     servers = servers.filter(s => s.url !== selected);
     saveServers(servers);
     populateServerSelect();
+    setActiveServer(servers[0]?.url, { loadModels: true });
   });
+
+  els.settingsServerLoad?.addEventListener("click", () => handleLoadModels());
 
   els.load?.addEventListener("click", () => handleLoadModels());
   els.send?.addEventListener("click", () => handleSend());
@@ -240,11 +263,32 @@ function wireEvents() {
       els.send.click();
     }
   });
+
+  els.openSettings?.addEventListener("click", () => {
+    els.settingsModal?.classList.remove("hidden");
+  });
+
+  els.closeSettings?.addEventListener("click", () => {
+    els.settingsModal?.classList.add("hidden");
+  });
+
+  els.glowRange?.addEventListener("input", () => {
+    applyGlow(Number(els.glowRange.value));
+  });
+
+  els.scanlineRange?.addEventListener("input", () => {
+    applyScanlines(Number(els.scanlineRange.value));
+  });
 }
 
 function init() {
   populateServerSelect();
+  applyGlow(glowIntensity);
+  applyScanlines(scanlineOpacity);
+  if (els.glowRange) els.glowRange.value = glowIntensity;
+  if (els.scanlineRange) els.scanlineRange.value = scanlineOpacity;
   wireEvents();
+  setActiveServer(els.serverSelect?.value || servers[0]?.url, { loadModels: true });
 }
 
 init();
