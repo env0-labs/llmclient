@@ -1,0 +1,613 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ewan's LLM</title>
+
+  <!-- Markdown renderer -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    :root{
+      --bg: #020b06;
+
+      /* Panels: dark, but not fighting text */
+      --panel: #010503;
+      --panel-inner: #020a06;
+
+      --border: rgba(0, 255, 140, 0.18);
+
+      /* Text: bright phosphor */
+      --text: #9affc2;
+      --text-dim: #6fe6a3;
+      --text-strong: #c8ffdd;
+      --accent: #00ff7a;
+
+      --shadow: rgba(0, 255, 140, 0.18);
+
+      --codebg: #010402;
+      --inputbg: #020a06;
+
+      --space: 12px; /* single source of truth for spacing */
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+
+      background:
+        radial-gradient(1200px 800px at 50% 28%, #031c11 0%, var(--bg) 55%, #010402 100%);
+
+      color: var(--text);
+      font-family: "Courier New", Courier, ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.2px;
+    }
+
+    body::before{
+      content:"";
+      pointer-events:none;
+      position:fixed;
+      inset:0;
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          rgba(0,0,0,0) 0px,
+          rgba(0,0,0,0) 2px,
+          rgba(0,0,0,0.12) 3px
+        );
+      opacity: 0.45;
+      mix-blend-mode: multiply;
+    }
+
+    @keyframes flicker {
+      0% { opacity: 0.993; }
+      50% { opacity: 1; }
+      100% { opacity: 0.996; }
+    }
+
+    .app {
+      animation: flicker 7s infinite;
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 14px;
+      padding: 14px;
+      min-height: 100vh;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, var(--panel-inner), var(--panel));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow:
+        inset 0 0 40px rgba(0,255,140,0.03),
+        0 0 18px var(--shadow);
+      padding: 14px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .panel::before{
+      content:"";
+      pointer-events:none;
+      position:absolute;
+      inset:0;
+      background: radial-gradient(circle at 35% 12%, rgba(0,255,140,0.06), transparent 45%);
+      opacity: 0.9;
+    }
+
+    h2 {
+      margin: 0 0 8px 0;
+      color: var(--text-strong);
+      text-shadow:
+        0 0 3px rgba(220,255,235,0.95),
+        0 0 16px rgba(0,255,140,0.40);
+      letter-spacing: 0.8px;
+      position: relative;
+    }
+
+    .muted {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      margin-bottom: var(--space);
+      text-shadow:
+        0 0 2px rgba(200,255,220,0.60),
+        0 0 10px rgba(0,255,140,0.16);
+      position: relative;
+    }
+
+    label {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      position: relative;
+      white-space: nowrap;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 10px;
+      margin-bottom: var(--space);
+      align-items: center;
+      position: relative;
+    }
+
+    input, select, textarea, button {
+      width: 100%;
+      background: var(--inputbg);
+      border: 1px solid var(--border);
+      color: var(--text-strong);
+      border-radius: 10px;
+      padding: 10px 12px;
+      outline: none;
+      font-family: inherit;
+      box-shadow: inset 0 0 18px rgba(0,255,140,0.05);
+      text-shadow:
+        0 0 2px rgba(200,255,220,0.80),
+        0 0 10px rgba(0,255,140,0.18);
+      position: relative;
+    }
+
+    textarea {
+      height: 200px;
+      resize: vertical;
+      line-height: 1.35;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: rgba(0,255,140,0.45);
+      box-shadow:
+        inset 0 0 22px rgba(0,255,140,0.08),
+        0 0 12px rgba(0,255,140,0.16);
+    }
+
+    ::placeholder { color: rgba(154,255,194,0.45); }
+
+    .btnrow {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: var(--space);
+      position: relative;
+    }
+
+    .btnfull {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: var(--space);
+      position: relative;
+    }
+
+    button {
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 700;
+    }
+
+    button:hover {
+      border-color: rgba(0,255,140,0.42);
+      box-shadow: 0 0 14px rgba(0,255,140,0.18);
+    }
+
+    button[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* OUTPUT */
+    #out {
+      height: calc(100vh - 28px);
+      overflow: auto;
+      padding: 14px;
+      line-height: 1.45;
+      font-size: 0.98rem;
+      color: var(--text);
+      text-shadow:
+        0 0 2px rgba(200,255,220,0.90),
+        0 0 12px rgba(0,255,140,0.32);
+      position: relative;
+    }
+
+    #out h1, #out h2, #out h3 {
+      margin-top: 14px;
+      color: var(--text-strong);
+      text-shadow:
+        0 0 3px rgba(220,255,235,0.95),
+        0 0 16px rgba(0,255,140,0.42);
+    }
+
+    #out p { margin: 10px 0; }
+    #out ul, #out ol { margin-left: 22px; }
+    #out a { color: var(--accent); }
+    #out hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+    #out blockquote {
+      margin: 12px 0;
+      padding: 10px 12px;
+      border-left: 3px solid rgba(0,255,140,0.45);
+      background: #000;
+      color: var(--text-dim);
+      text-shadow:
+        0 0 2px rgba(200,255,220,0.55),
+        0 0 10px rgba(0,255,140,0.14);
+    }
+
+    #out pre {
+      background: var(--codebg);
+      border: 1px solid rgba(0,255,140,0.22);
+      border-radius: 10px;
+      padding: 12px;
+      overflow: auto;
+      box-shadow: inset 0 0 24px rgba(0,255,140,0.06);
+    }
+
+    #out code {
+      background: #000;
+      padding: 1px 4px;
+      border-radius: 6px;
+      color: var(--text-strong);
+    }
+
+    #out pre code {
+      background: transparent;
+      padding: 0;
+    }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      #out { height: auto; max-height: 60vh; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <!-- LEFT: settings + input -->
+  <div class="panel">
+    <h2>Ewan's LLM</h2>
+    <div class="muted">Enter to send · Shift+Enter newline · Streaming on</div>
+
+    <!-- Canonical base URL (hidden; still used by fetch code) -->
+    <input id="base" value="http://192.168.1.129:1234" type="hidden" />
+
+    <!-- Selected server (nickname only, no IP) -->
+    <div class="row">
+      <label for="serverSelect">Selected Server</label>
+      <select id="serverSelect"></select>
+    </div>
+
+    <div class="btnrow">
+      <button id="serverAddToggle" type="button">Add</button>
+      <button id="serverRemove" type="button" title="Remove selected server">Remove</button>
+    </div>
+
+    <!-- Add server panel -->
+    <div id="serverAddPanel" class="row" style="display:none;">
+      <label style="align-self:flex-start;">New</label>
+      <div style="display:flex; flex-direction:column; gap:8px; width:100%; position:relative;">
+        <input id="serverNick" placeholder="Nickname (e.g., bitfuser)" />
+        <input id="serverUrl" placeholder="http://192.168.1.129:1234" />
+        <div style="display:flex; gap:8px;">
+          <button id="serverSave" type="button">Save</button>
+          <button id="serverCancel" type="button">Cancel</button>
+        </div>
+        <div class="muted" style="margin:0;">Stored locally in your browser (localStorage).</div>
+      </div>
+    </div>
+
+    <!-- Load button above model -->
+    <div class="btnfull">
+      <button id="load">Load models</button>
+    </div>
+
+    <div class="row">
+      <label for="model">Model</label>
+      <select id="model"></select>
+    </div>
+
+    <div class="row">
+      <label for="temp">Temp</label>
+      <input id="temp" type="number" min="0" max="2" step="0.1" value="0.7" />
+    </div>
+
+    <div class="row">
+      <label for="max">Max</label>
+      <input id="max" type="number" min="1" max="6000" step="1" value="3000" />
+    </div>
+
+    <div class="btnfull">
+      <button id="stop" disabled>Stop</button>
+    </div>
+
+    <label for="prompt" style="display:block; margin-bottom:8px;">Prompt</label>
+    <textarea id="prompt" placeholder="Type a prompt..."></textarea>
+
+    <div class="btnrow" style="margin-top: var(--space); margin-bottom: 0;">
+      <button id="send">Send</button>
+      <button id="clear">Clear</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: output -->
+  <div class="panel" style="padding:0;">
+    <div id="out">(nothing yet)</div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let abortController = null;
+
+if (window.marked) {
+  marked.setOptions({ gfm: true, breaks: false });
+}
+
+function setBusy(busy) {
+  $("send").disabled = busy;
+  $("load").disabled = busy;
+  $("stop").disabled = !busy;
+
+  $("serverSelect").disabled = busy;
+  $("serverAddToggle").disabled = busy;
+  $("serverRemove").disabled = busy;
+  $("base").disabled = busy;
+  $("serverNick").disabled = busy;
+  $("serverUrl").disabled = busy;
+  $("serverSave").disabled = busy;
+  $("serverCancel").disabled = busy;
+}
+
+function renderMarkdown(text) {
+  if (!window.marked) {
+    $("out").textContent = text;
+    return;
+  }
+  $("out").innerHTML = marked.parse(text);
+}
+
+/* ---------------------------
+   Server manager (localStorage)
+---------------------------- */
+const LS_KEY = "ewan_llm_servers_v1";
+
+function normaliseUrl(u) {
+  const trimmed = (u || "").trim();
+  if (!trimmed) return "";
+  if (!/^https?:\/\//i.test(trimmed)) return `http://${trimmed}`;
+  return trimmed;
+}
+
+const DEFAULT_SERVERS = [
+  { nick: "bitfuser", url: "http://192.168.1.129:1234" }
+];
+
+function loadServers() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return [...DEFAULT_SERVERS];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return [...DEFAULT_SERVERS];
+    return parsed
+      .filter(s => s && typeof s.nick === "string" && typeof s.url === "string")
+      .map(s => ({ nick: s.nick.trim() || "server", url: normaliseUrl(s.url) }))
+      .filter(s => s.url);
+  } catch {
+    return [...DEFAULT_SERVERS];
+  }
+}
+
+function saveServers(list) {
+  localStorage.setItem(LS_KEY, JSON.stringify(list));
+}
+
+let servers = loadServers();
+
+function populateServerSelect(selectedUrl) {
+  const sel = $("serverSelect");
+  sel.innerHTML = "";
+
+  // IMPORTANT: nickname only (no IP/URL in UI)
+  servers.forEach((s) => {
+    const opt = document.createElement("option");
+    opt.value = s.url;          // internal value
+    opt.textContent = s.nick;   // human display
+    sel.appendChild(opt);
+  });
+
+  const urlToSelect = selectedUrl || normaliseUrl($("base").value) || servers[0]?.url;
+  const match = [...sel.options].find(o => o.value === urlToSelect);
+
+  if (match) sel.value = urlToSelect;
+  else if (servers[0]) sel.value = servers[0].url;
+
+  $("base").value = sel.value || $("base").value;
+}
+
+function openAddPanel(open) {
+  $("serverAddPanel").style.display = open ? "flex" : "none";
+  if (open) {
+    $("serverNick").value = "";
+    $("serverUrl").value = "";
+    $("serverNick").focus();
+  }
+}
+
+// Init
+populateServerSelect();
+
+$("serverSelect").addEventListener("change", () => {
+  $("base").value = $("serverSelect").value;
+});
+
+// Kept for safety, even though base is hidden
+$("base").addEventListener("change", () => {
+  const u = normaliseUrl($("base").value);
+  $("base").value = u;
+  const match = servers.find(s => s.url === u);
+  if (match) populateServerSelect(u);
+});
+
+$("serverAddToggle").addEventListener("click", () => {
+  const isOpen = $("serverAddPanel").style.display !== "none";
+  openAddPanel(!isOpen);
+});
+
+$("serverCancel").addEventListener("click", () => openAddPanel(false));
+
+$("serverSave").addEventListener("click", () => {
+  const nick = ($("serverNick").value || "").trim() || "server";
+  const url = normaliseUrl($("serverUrl").value);
+  if (!url) return;
+
+  const existingIdx = servers.findIndex(s => s.url === url);
+  if (existingIdx >= 0) {
+    servers[existingIdx].nick = nick;
+  } else {
+    servers.push({ nick, url });
+  }
+
+  saveServers(servers);
+  populateServerSelect(url);
+  openAddPanel(false);
+});
+
+$("serverRemove").addEventListener("click", () => {
+  const selected = $("serverSelect").value;
+  if (!selected) return;
+  if (servers.length <= 1) return;
+
+  servers = servers.filter(s => s.url !== selected);
+  saveServers(servers);
+  populateServerSelect();
+});
+
+/* ---------------------------
+   Model loading + streaming
+---------------------------- */
+
+async function loadModels() {
+  renderMarkdown("Loading models...");
+  const base = $("base").value.replace(/\/+$/, "");
+  const res = await fetch(`${base}/v1/models`);
+  if (!res.ok) throw new Error(`Models failed: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+
+  $("model").innerHTML = "";
+  for (const m of (data.data || [])) {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = m.id;
+    $("model").appendChild(opt);
+  }
+  renderMarkdown("Models loaded.");
+}
+
+async function sendStream() {
+  const base = $("base").value.replace(/\/+$/, "");
+  const prompt = $("prompt").value.trim();
+  if (!prompt) return;
+
+  setBusy(true);
+  abortController = new AbortController();
+
+  let fullText = "";
+  renderMarkdown("");
+
+  const body = {
+    model: $("model").value,
+    messages: [{ role: "user", content: prompt }],
+    temperature: Number($("temp").value),
+    max_tokens: Number($("max").value),
+    stream: true
+  };
+
+  const res = await fetch(`${base}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: abortController.signal
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Request failed: ${res.status} ${errText}`);
+  }
+  if (!res.body) throw new Error("No response body (streaming not supported by this browser/endpoint).");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const parts = buffer.split(/\n\n/);
+      buffer = parts.pop() || "";
+
+      for (const part of parts) {
+        const lines = part.split("\n");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+
+          const dataStr = trimmed.slice(5).trim();
+          if (dataStr === "[DONE]") {
+            renderMarkdown(fullText);
+            $("out").scrollTop = $("out").scrollHeight;
+            return;
+          }
+
+          let evt;
+          try { evt = JSON.parse(dataStr); } catch { continue; }
+
+          const delta = evt?.choices?.[0]?.delta?.content;
+          if (typeof delta === "string" && delta.length) {
+            fullText += delta;
+            renderMarkdown(fullText);
+            $("out").scrollTop = $("out").scrollHeight;
+          }
+        }
+      }
+    }
+  } finally {
+    setBusy(false);
+    abortController = null;
+  }
+}
+
+$("load").addEventListener("click", () =>
+  loadModels().catch(e => renderMarkdown(String(e)))
+);
+
+$("send").addEventListener("click", () =>
+  sendStream().catch(e => {
+    setBusy(false);
+    abortController = null;
+    renderMarkdown(String(e));
+  })
+);
+
+$("stop").addEventListener("click", () => abortController?.abort());
+
+$("clear").addEventListener("click", () => {
+  $("prompt").value = "";
+  renderMarkdown("(cleared)");
+});
+
+$("prompt").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    $("send").click();
+  }
+});
+</script>
+</body>
+</html>
