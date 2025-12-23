@@ -22,7 +22,11 @@
   --glow-1: 0.35;
   --glow-2: 0.18;
   --glow-3: 0.10;
-  --scanline-opacity: 0.35;
+  --scanline-opacity: 0.09;
+  --scanline-thickness: 3px;
+  --scanline-gap: 6px;
+  --scanline-glow: 0.08;
+  --vignette: rgba(0, 0, 0, 0.55);
 
   --space: 12px; /* single source of truth for spacing */
 }
@@ -51,13 +55,15 @@ body::before {
   position: fixed;
   inset: 0;
   background:
+    radial-gradient(120% 120% at 50% 45%, transparent 35%, rgba(0,0,0,0.35) 72%, var(--vignette) 100%),
     repeating-linear-gradient(
       to bottom,
-      rgba(0,0,0,0) 0px,
-      rgba(0,0,0,0) 2px,
-      rgba(0,0,0,0.12) 3px
+      rgba(0,0,0,0.10) 0px,
+      rgba(0,0,0,0.10) 2px,
+      rgba(0,0,0,0) 4px,
+      rgba(0,0,0,0) 6px
     );
-  opacity: 0.45;
+  opacity: 0.85;
   mix-blend-mode: multiply;
 }
 
@@ -70,18 +76,37 @@ body::after {
     repeating-linear-gradient(
       to bottom,
       rgba(0, 255, 140, var(--scanline-opacity)) 0px,
-      rgba(0, 255, 140, var(--scanline-opacity)) 1px,
-      rgba(0, 0, 0, 0) 2px,
-      rgba(0, 0, 0, 0) 3px
+      rgba(0, 255, 140, var(--scanline-opacity)) var(--scanline-thickness),
+      rgba(0, 0, 0, 0) calc(var(--scanline-thickness) + 2px),
+      rgba(0, 0, 0, 0) calc(var(--scanline-thickness) + var(--scanline-gap))
+    ),
+    linear-gradient(
+      90deg,
+      rgba(0,255,140,var(--scanline-glow)) 0%,
+      rgba(0,0,0,0) 28%,
+      rgba(0,255,140,var(--scanline-glow)) 50%,
+      rgba(0,0,0,0) 72%,
+      rgba(0,255,140,var(--scanline-glow)) 100%
     );
-  opacity: 1;
+  opacity: 0.9;
   mix-blend-mode: screen;
+  animation: scanShift 12s linear infinite, scanPulse 3.4s ease-in-out infinite;
 }
 
 @keyframes flicker {
   0% { opacity: 0.993; }
   50% { opacity: 1; }
   100% { opacity: 0.996; }
+}
+
+@keyframes scanShift {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 0 -12px, 0 0; }
+}
+
+@keyframes scanPulse {
+  0%, 100% { filter: brightness(0.96); }
+  50% { filter: brightness(1.06); }
 }
 
 .app {
@@ -91,9 +116,15 @@ body::after {
   gap: 14px;
   padding: 14px;
   min-height: 100vh;
+  height: 100vh;
+  filter: contrast(1.05) saturate(1.08);
+  transform: perspective(1400px) rotateX(0.5deg);
 }
 
 .panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: linear-gradient(180deg, var(--panel-inner), var(--panel));
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -234,6 +265,17 @@ button {
   color: var(--text-strong);
 }
 
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  padding: 0;
+}
+
 button:hover {
   border-color: rgba(0,255,140,0.42);
   box-shadow: 0 0 14px rgba(0,255,140,0.18);
@@ -246,7 +288,6 @@ button[disabled] {
 
 /* OUTPUT */
 #out {
-  height: calc(100vh - 28px);
   overflow: auto;
   padding: 14px;
   line-height: 1.45;
@@ -260,6 +301,23 @@ button[disabled] {
   /* Scrollbar theme */
   scrollbar-width: thin;
   scrollbar-color: rgba(0,255,140,0.35) #000;
+}
+
+.output-panel {
+  padding: 0;
+  height: 100%;
+}
+
+.output-shell {
+  display: grid;
+  grid-template-rows: minmax(0, 3fr) minmax(120px, 1fr);
+  height: 100%;
+}
+
+#out {
+  height: auto;
+  max-height: none;
+  min-height: 0;
 }
 
 #out h1, #out h2, #out h3 {
@@ -326,6 +384,25 @@ button[disabled] {
 
 #out::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, rgba(0,255,140,0.38), rgba(0,255,140,0.65));
+}
+
+#vizShell {
+  height: 100%;
+  min-height: 120px;
+  border-top: 1px solid var(--border);
+  background: radial-gradient(circle at 30% 30%, rgba(0,255,140,0.06), transparent 60%), #000;
+  position: relative;
+  overflow: hidden;
+}
+
+#viz {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.panel:not(.output-panel) {
+  overflow-y: auto;
 }
 
 .msg {

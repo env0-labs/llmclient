@@ -18,7 +18,7 @@
           <h2>Ewan's LLM</h2>
           <div class="muted">Enter to send | Shift+Enter newline | Streaming on</div>
         </div>
-        <button id="openSettings" class="ghost" type="button">Settings</button>
+        <button id="openSettings" class="icon-btn" type="button" title="Settings">⚙</button>
       </div>
 
       <!-- Canonical base URL (hidden; still used by fetch code) -->
@@ -37,34 +37,13 @@
         <select id="model"></select>
       </div>
 
-      <div class="row">
-        <label for="temp">Temp</label>
-        <input id="temp" type="number" min="0" max="2" step="0.1" value="0.7" />
+      <div class="btnfull" style="margin-top: var(--space);">
+        <button id="toggleSystemPrompt" type="button">Custom system instruction</button>
       </div>
 
-      <div class="row">
-        <label for="max">Max</label>
-        <input id="max" type="number" min="1" max="6000" step="1" value="3000" />
-      </div>
-
-      <div class="row">
-        <label for="rolePreset">Preset</label>
-        <select id="rolePreset">
-          <option value="">Custom</option>
-          <option value="You are a concise assistant." selected>Concise</option>
-          <option value="You are a friendly helper with short, clear answers.">Friendly</option>
-          <option value="You are a strict analyst. Answer with bullet points and cite uncertainties.">Analyst</option>
-        </select>
-      </div>
-
-      <div id="systemPromptRow">
+      <div id="systemPromptRow" class="hidden">
         <label for="systemPrompt" style="display:block; margin-bottom:8px;">System prompt</label>
         <textarea id="systemPrompt" placeholder="Set behaviour, tone, or constraints..." style="height:120px;"></textarea>
-      </div>
-
-      <!-- Load button above model -->
-      <div class="btnfull">
-        <button id="load" type="button">Reload models</button>
       </div>
 
       <div class="btnfull">
@@ -88,8 +67,13 @@
     </div>
 
     <!-- RIGHT: output -->
-    <div class="panel" style="padding:0;">
-      <div id="out">(nothing yet)</div>
+    <div class="panel output-panel">
+      <div class="output-shell">
+        <div id="out">(nothing yet)</div>
+        <div id="vizShell">
+          <canvas id="viz"></canvas>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -108,7 +92,6 @@
         </div>
         <div class="action-row" style="margin-bottom: var(--space);">
           <button id="settingsServerRemove" type="button">Remove</button>
-          <button id="settingsServerLoad" type="button">Load models</button>
         </div>
         <div class="stack">
           <input id="settingsServerNick" placeholder="Nickname (e.g., bitfuser)" />
@@ -121,6 +104,18 @@
       </div>
 
       <div class="settings-section">
+        <div class="section-title">Generation</div>
+        <div class="row">
+          <label for="temp">Temp</label>
+          <input id="temp" type="number" min="0" max="2" step="0.1" value="0.7" />
+        </div>
+        <div class="row">
+          <label for="max">Max tokens</label>
+          <input id="max" type="number" min="1" max="6000" step="1" value="3000" />
+        </div>
+      </div>
+
+      <div class="settings-section">
         <div class="section-title">Screen FX</div>
         <div class="row range-row">
           <label for="glowRange">Glow</label>
@@ -128,7 +123,7 @@
         </div>
         <div class="row range-row">
           <label for="scanlineRange">Scanlines</label>
-          <input id="scanlineRange" type="range" min="0" max="0.6" step="0.02" value="0.35" />
+          <input id="scanlineRange" type="range" min="0" max="0.6" step="0.02" value="0.09" />
         </div>
       </div>
     </div>
