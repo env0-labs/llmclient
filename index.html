@@ -47,6 +47,21 @@
         <input id="max" type="number" min="1" max="6000" step="1" value="3000" />
       </div>
 
+      <div class="row">
+        <label for="rolePreset">Preset</label>
+        <select id="rolePreset">
+          <option value="">Custom</option>
+          <option value="You are a concise assistant." selected>Concise</option>
+          <option value="You are a friendly helper with short, clear answers.">Friendly</option>
+          <option value="You are a strict analyst. Answer with bullet points and cite uncertainties.">Analyst</option>
+        </select>
+      </div>
+
+      <div id="systemPromptRow">
+        <label for="systemPrompt" style="display:block; margin-bottom:8px;">System prompt</label>
+        <textarea id="systemPrompt" placeholder="Set behaviour, tone, or constraints..." style="height:120px;"></textarea>
+      </div>
+
       <!-- Load button above model -->
       <div class="btnfull">
         <button id="load" type="button">Reload models</button>
@@ -63,6 +78,13 @@
         <button id="send" type="button">Send</button>
         <button id="clear" type="button">Clear</button>
       </div>
+
+      <div class="btnrow" style="margin-top: var(--space);">
+        <button id="retry" type="button">Retry last</button>
+        <button id="clearHistory" type="button">Clear history</button>
+      </div>
+
+      <div id="statusBar" class="muted slim-note">(idle)</div>
     </div>
 
     <!-- RIGHT: output -->

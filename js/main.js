@@ -12,8 +12,14 @@ const els = {
   stop: $("stop"),
   send: $("send"),
   clear: $("clear"),
+  retry: $("retry"),
+  clearHistory: $("clearHistory"),
   prompt: $("prompt"),
+  systemPrompt: $("systemPrompt"),
+  systemPromptRow: $("systemPromptRow"),
+  rolePreset: $("rolePreset"),
   out: $("out"),
+  statusBar: $("statusBar"),
   openSettings: $("openSettings"),
   closeSettings: $("closeSettings"),
   settingsModal: $("settingsModal"),
@@ -30,10 +36,14 @@ const els = {
 let abortController = null;
 let servers = loadServers();
 let conversation = [];
+let lastPrompt = "";
 const GLOW_BASE = [0.35, 0.18, 0.10];
 const SCANLINE_DEFAULT = 0.35;
 let glowIntensity = 1;
 let scanlineOpacity = SCANLINE_DEFAULT;
+const CONVO_KEY_PREFIX = "ewan_llm_convo_";
+const SYS_KEY_PREFIX = "ewan_llm_sys_";
+let streamStats = { start: 0, chunks: 0, chars: 0, done: true };
 
 function populateServerSelect(selectedUrl) {
   const selects = [els.serverSelect, els.settingsServerSelect].filter(Boolean);
@@ -82,6 +92,61 @@ function toggleBusy(busy) {
   });
 }
 
+function convoKey(url) {
+  const u = normaliseUrl(url || els.base?.value || "");
+  return `${CONVO_KEY_PREFIX}${u || "default"}`;
+}
+
+function sysKey(url) {
+  const u = normaliseUrl(url || els.base?.value || "");
+  return `${SYS_KEY_PREFIX}${u || "default"}`;
+}
+
+function saveConversation() {
+  const key = convoKey();
+  localStorage.setItem(key, JSON.stringify({ conversation, lastPrompt }));
+}
+
+function loadConversation() {
+  const key = convoKey();
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) {
+      conversation = [];
+      lastPrompt = "";
+      return;
+    }
+    const data = JSON.parse(raw);
+    conversation = Array.isArray(data.conversation) ? data.conversation : [];
+    lastPrompt = typeof data.lastPrompt === "string" ? data.lastPrompt : "";
+  } catch {
+    conversation = [];
+    lastPrompt = "";
+  }
+}
+
+function saveSystemPrompt() {
+  const key = sysKey();
+  localStorage.setItem(key, JSON.stringify({ system: els.systemPrompt?.value || "" }));
+}
+
+function loadSystemPrompt() {
+  const key = sysKey();
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (typeof data.system === "string" && els.systemPrompt) {
+      els.systemPrompt.value = data.system;
+      // align preset selection with stored system prompt
+      if (els.rolePreset) {
+        const match = [...els.rolePreset.options].find(opt => opt.value === data.system);
+        els.rolePreset.value = match ? match.value : "";
+      }
+    }
+  } catch { /* noop */ }
+}
+
 function setActiveServer(url, { loadModels = true } = {}) {
   const normalized = normaliseUrl(url);
   if (!normalized) return;
@@ -90,6 +155,9 @@ function setActiveServer(url, { loadModels = true } = {}) {
   if (els.serverSelect) els.serverSelect.value = normalized;
   if (els.settingsServerSelect) els.settingsServerSelect.value = normalized;
 
+  loadConversation();
+  renderConversation();
+  loadSystemPrompt();
   if (loadModels) handleLoadModels();
 }
 
@@ -108,6 +176,29 @@ function applyScanlines(opacity) {
   root.style.setProperty("--scanline-opacity", opacity.toFixed(3));
 }
 
+function updateStatus(text) {
+  if (els.statusBar) {
+    els.statusBar.textContent = text || "(idle)";
+  }
+}
+
+function updateStatusFromStats(done = false) {
+  const elapsed = streamStats.start ? ((performance.now() - streamStats.start) / 1000).toFixed(2) : "0.00";
+  const label = done ? "Done" : "Streaming";
+  const msg = `${label} • ${streamStats.chunks} chunks • ${streamStats.chars} chars • ${elapsed}s`;
+  updateStatus(msg);
+}
+
+function updateSystemPromptVisibility() {
+  const show = !els.rolePreset || els.rolePreset.value === "";
+  if (els.systemPromptRow) {
+    els.systemPromptRow.classList.toggle("hidden", !show);
+  } else {
+    const row = document.getElementById("systemPromptRow");
+    if (row) row.classList.toggle("hidden", !show);
+  }
+}
+
 function conversationToMarkdown() {
   if (!conversation.length) return "(nothing yet)";
 
@@ -124,6 +215,7 @@ function renderConversation(statusText = "") {
 
   if (!conversation.length) {
     renderMarkdown(els.out, statusText || "(nothing yet)");
+    updateStatus(statusText || "(idle)");
     return;
   }
 
@@ -144,6 +236,7 @@ function renderConversation(statusText = "") {
 
   els.out.innerHTML = `${convoHtml}${statusHtml ? `<div class="status-line">${statusHtml}</div>` : ""}`;
   els.out.scrollTop = els.out.scrollHeight;
+  if (statusText) updateStatus(statusText);
 }
 
 async function handleLoadModels() {
@@ -151,14 +244,17 @@ async function handleLoadModels() {
   const base = (els.base?.value || "").replace(/\/+$/, "");
   if (!base) {
     renderConversation("_Status: No server selected._");
+    updateStatus("No server selected");
     return;
   }
   try {
     const data = await fetchModels(base);
     populateModels(data);
     renderConversation("_Status: Models loaded._");
+    updateStatus("Models loaded");
   } catch (e) {
     renderConversation(`_Status: ${String(e)}_`);
+    updateStatus(`Error: ${String(e)}`);
   }
 }
 
@@ -167,37 +263,58 @@ async function handleSend() {
   const prompt = (els.prompt.value || "").trim();
   if (!prompt) return;
 
+  saveSystemPrompt();
+
   toggleBusy(true);
   abortController = new AbortController();
+  streamStats = { start: performance.now(), chunks: 0, chars: 0, done: false };
 
   const userMsg = { role: "user", content: prompt };
   const assistantMsg = { role: "assistant", content: "" };
   conversation.push(userMsg, assistantMsg);
   if (els.prompt) els.prompt.value = "";
   renderConversation();
+  lastPrompt = prompt;
+  saveConversation();
+  updateStatusFromStats();
+
+  const systemMsg = (els.systemPrompt?.value || "").trim();
+  const messages = [];
+  if (systemMsg) messages.push({ role: "system", content: systemMsg });
+  messages.push(...conversation.slice(0, -1));
 
   try {
     await streamChat({
       base,
-      messages: conversation.slice(0, -1), // exclude the in-progress assistant message
+      messages, // exclude the in-progress assistant message
       model: els.model.value,
       temperature: Number(els.temp.value),
       maxTokens: Number(els.max.value),
       signal: abortController.signal,
       onDelta: (delta) => {
         assistantMsg.content += delta;
+        streamStats.chunks += 1;
+        streamStats.chars += delta.length;
         renderConversation();
+        saveConversation();
+        updateStatusFromStats();
       },
       onDone: () => {
         renderConversation();
+        saveConversation();
+        streamStats.done = true;
+        updateStatusFromStats(true);
       }
     });
   } catch (e) {
     assistantMsg.content = `Error: ${String(e)}`;
     renderConversation();
+    saveConversation();
+    updateStatus(`Error: ${String(e)}`);
   } finally {
     toggleBusy(false);
     abortController = null;
+    streamStats.done = true;
   }
 }
 
@@ -254,7 +371,22 @@ function wireEvents() {
   els.clear?.addEventListener("click", () => {
     if (els.prompt) els.prompt.value = "";
     conversation = [];
+    lastPrompt = "";
+    saveConversation();
     renderConversation("(cleared)");
+  });
+
+  els.retry?.addEventListener("click", () => {
+    if (!lastPrompt) return;
+    if (els.prompt) els.prompt.value = lastPrompt;
+    handleSend();
+  });
+
+  els.clearHistory?.addEventListener("click", () => {
+    conversation = [];
+    lastPrompt = "";
+    saveConversation();
+    renderConversation("(history cleared)");
   });
 
   els.prompt?.addEventListener("keydown", (e) => {
@@ -279,6 +411,25 @@ function wireEvents() {
   els.scanlineRange?.addEventListener("input", () => {
     applyScanlines(Number(els.scanlineRange.value));
   });
+
+  els.rolePreset?.addEventListener("change", () => {
+    const val = els.rolePreset.value;
+    if (els.systemPrompt && val) {
+      els.systemPrompt.value = val;
+    } else if (els.systemPrompt && !val) {
+      // keep custom text as-is
+    }
+    saveSystemPrompt();
+    updateSystemPromptVisibility();
+  });
+
+  els.systemPrompt?.addEventListener("input", () => {
+    if (els.rolePreset && els.rolePreset.value) {
+      els.rolePreset.value = "";
+    }
+    saveSystemPrompt();
+    updateSystemPromptVisibility();
+  });
 }
 
 function init() {
@@ -287,8 +438,13 @@ function init() {
   applyScanlines(scanlineOpacity);
   if (els.glowRange) els.glowRange.value = glowIntensity;
   if (els.scanlineRange) els.scanlineRange.value = scanlineOpacity;
+  updateSystemPromptVisibility();
   wireEvents();
   setActiveServer(els.serverSelect?.value || servers[0]?.url, { loadModels: true });
+  loadConversation();
+  renderConversation();
+  loadSystemPrompt();
+  updateSystemPromptVisibility();
 }
 
 init();

@@ -380,6 +380,10 @@ button[disabled] {
   font-size: 0.9rem;
 }
 
+#statusBar {
+  margin-top: 6px;
+}
+
 .modal {
   position: fixed;
   inset: 0;
